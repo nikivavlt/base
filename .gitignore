@@ -1,0 +1,13 @@
+# Environment
+.env
+
+# Go binaries
+backend/bin/
+*.exe
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
