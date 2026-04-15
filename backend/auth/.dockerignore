@@ -1,0 +1,9 @@
+# Go
+*.exe
+*.test
+*.env
+tmp/
+
+# Git
+.git
+.gitignore

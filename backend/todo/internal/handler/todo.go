@@ -7,10 +7,9 @@ import (
     "net/http"
     "strconv"
 
-    "github.com/nikivavlt/base/internal/db"
+    "github.com/nikivavlt/base/todo/internal/db"
 )
 
-// Handler holds shared dependencies — DB queries in our case
 type Handler struct {
     queries *db.Queries
 }
@@ -19,7 +18,6 @@ func New(queries *db.Queries) *Handler {
     return &Handler{queries: queries}
 }
 
-// GET /api/todos
 func (h *Handler) GetTodos(w http.ResponseWriter, r *http.Request) {
     todos, err := h.queries.GetTodos(r.Context())
     if err != nil {
@@ -27,7 +25,6 @@ func (h *Handler) GetTodos(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Return empty array instead of null when no todos exist
     if todos == nil {
         todos = []db.Todo{}
     }
@@ -35,7 +32,6 @@ func (h *Handler) GetTodos(w http.ResponseWriter, r *http.Request) {
     writeJSON(w, http.StatusOK, todos)
 }
 
-// GET /api/todos/{id}
 func (h *Handler) GetTodo(w http.ResponseWriter, r *http.Request) {
     id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
     if err != nil {
@@ -56,7 +52,6 @@ func (h *Handler) GetTodo(w http.ResponseWriter, r *http.Request) {
     writeJSON(w, http.StatusOK, todo)
 }
 
-// POST /api/todos
 func (h *Handler) CreateTodo(w http.ResponseWriter, r *http.Request) {
     var body struct {
         Title string `json:"title"`
@@ -81,7 +76,6 @@ func (h *Handler) CreateTodo(w http.ResponseWriter, r *http.Request) {
     writeJSON(w, http.StatusCreated, todo)
 }
 
-// PATCH /api/todos/{id}
 func (h *Handler) UpdateTodo(w http.ResponseWriter, r *http.Request) {
     id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
     if err != nil {
@@ -116,7 +110,6 @@ func (h *Handler) UpdateTodo(w http.ResponseWriter, r *http.Request) {
     writeJSON(w, http.StatusOK, todo)
 }
 
-// DELETE /api/todos/{id}
 func (h *Handler) DeleteTodo(w http.ResponseWriter, r *http.Request) {
     id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
     if err != nil {
@@ -133,5 +126,5 @@ func (h *Handler) DeleteTodo(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    w.WriteHeader(http.StatusNoContent) // 204 — success, no body
+    w.WriteHeader(http.StatusNoContent)
 }

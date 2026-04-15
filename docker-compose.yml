@@ -1,0 +1,116 @@
+services:
+  # ── Infrastructure ──────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: base_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: todo_user
+      POSTGRES_PASSWORD: todo_pass
+      POSTGRES_DB: todo_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U todo_user -d todo_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: base_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Migrations ───────────────────────────────────────────
+  migrate-todo:
+    image: migrate/migrate
+    volumes:
+      - ./backend/todo/migrations:/migrations
+    command: ["-path", "/migrations", "-database", "postgres://todo_user:todo_pass@postgres:5432/todo_db?sslmode=disable&x-migrations-table=schema_migrations_todo", "up"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
+  migrate-auth:
+    image: migrate/migrate
+    volumes:
+      - ./backend/auth/migrations:/migrations
+    command: ["-path", "/migrations", "-database", "postgres://todo_user:todo_pass@postgres:5432/todo_db?sslmode=disable&x-migrations-table=schema_migrations_auth", "up"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
+  # ── Auth Service ─────────────────────────────────────────
+  auth-service:
+    build:
+      context: ./backend/auth
+      dockerfile: Dockerfile
+    container_name: base_auth
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      DB_URL: postgres://todo_user:todo_pass@postgres:5432/todo_db?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGIN: http://localhost
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate-auth:
+        condition: service_completed_successfully
+
+  # ── Todo Service ─────────────────────────────────────────
+  todo-service:
+    build:
+      context: ./backend/todo
+      dockerfile: Dockerfile
+    container_name: base_todo
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: postgres://todo_user:todo_pass@postgres:5432/todo_db?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGIN: http://localhost
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate-todo:
+        condition: service_completed_successfully
+
+  # ── Frontend ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8080/api
+        VITE_AUTH_URL: http://localhost:8081
+    container_name: base_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - todo-service
+      - auth-service
+
+volumes:
+  postgres_data:
+  redis_data:
