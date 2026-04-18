@@ -19,8 +19,6 @@ func New(queries *db.Queries, redis *redis.Store, jwt *jwtpkg.Manager) *Handler 
     return &Handler{queries: queries, redis: redis, jwt: jwt}
 }
 
-// ── helpers ────────────────────────────────────────────────────────────────
-
 func writeJSON(w http.ResponseWriter, status int, data any) {
     w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(status)

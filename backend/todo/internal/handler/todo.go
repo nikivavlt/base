@@ -1,6 +1,7 @@
 package handler
 
 import (
+    "context"
     "database/sql"
     "encoding/json"
     "errors"
@@ -8,14 +9,16 @@ import (
     "strconv"
 
     "github.com/nikivavlt/base/todo/internal/db"
+    "github.com/nikivavlt/base/todo/internal/kafka"
 )
 
 type Handler struct {
-    queries *db.Queries
+    queries  *db.Queries
+    producer *kafka.Producer
 }
 
-func New(queries *db.Queries) *Handler {
-    return &Handler{queries: queries}
+func New(queries *db.Queries, producer *kafka.Producer) *Handler {
+    return &Handler{queries: queries, producer: producer}
 }
 
 func (h *Handler) GetTodos(w http.ResponseWriter, r *http.Request) {
@@ -72,6 +75,11 @@ func (h *Handler) CreateTodo(w http.ResponseWriter, r *http.Request) {
         writeError(w, http.StatusInternalServerError, "failed to create todo")
         return
     }
+
+    go h.producer.PublishTodoCreated(context.Background(), kafka.TodoCreatedEvent{
+        TodoID: todo.ID,
+        Title:  todo.Title,
+    })
 
     writeJSON(w, http.StatusCreated, todo)
 }

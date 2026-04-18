@@ -33,6 +33,29 @@ services:
       timeout: 5s
       retries: 5
 
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: base_kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic healthcheck --partitions 1 --replication-factor 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
   # ── Migrations ───────────────────────────────────────────
   migrate-todo:
     image: migrate/migrate
@@ -53,6 +76,19 @@ services:
       postgres:
         condition: service_healthy
     restart: on-failure
+
+  # ── Notification Service ─────────────────────────────────
+  notification-service:
+    build:
+      context: ./backend/notification
+      dockerfile: Dockerfile
+    container_name: base_notification
+    restart: unless-stopped
+    environment:
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
 
   # ── Auth Service ─────────────────────────────────────────
   auth-service:
@@ -89,11 +125,14 @@ services:
       DB_URL: postgres://todo_user:todo_pass@postgres:5432/todo_db?sslmode=disable
       JWT_SECRET: ${JWT_SECRET}
       CORS_ORIGIN: http://localhost
+      KAFKA_BROKER: kafka:9092
     depends_on:
       postgres:
         condition: service_healthy
       migrate-todo:
         condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
 
   # ── Frontend ─────────────────────────────────────────────
   frontend:
@@ -114,3 +153,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  kafka_data:

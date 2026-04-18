@@ -66,7 +66,9 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Refresh token → httpOnly cookie
+    // Clear any existing cookie before setting new one — prevents duplicates
+    clearRefreshCookie(w)
+
     setRefreshCookie(w, refreshToken)
 
     // Access token → JSON body (frontend stores in memory)
