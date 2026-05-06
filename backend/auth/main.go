@@ -10,9 +10,11 @@ import (
     "syscall"
 
     "github.com/nikivavlt/base/auth/internal/db"
-    jwtpkg "github.com/nikivavlt/base/auth/internal/jwt"
-    "github.com/nikivavlt/base/auth/internal/redis"
     "github.com/nikivavlt/base/auth/internal/handler"
+    jwtpkg "github.com/nikivavlt/base/auth/internal/jwt"
+    "github.com/nikivavlt/base/auth/internal/metrics"
+    "github.com/nikivavlt/base/auth/internal/redis"
+    "github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -35,9 +37,13 @@ func main() {
     jwt := jwtpkg.NewManager(jwtSecret)
     h   := handler.New(queries, redis, jwt)
 
+    mux := http.NewServeMux()
+    mux.Handle("/metrics", promhttp.Handler())
+    mux.Handle("/", handler.NewRouter(h))
+
     srv := &http.Server{
         Addr:         ":8081",
-        Handler:      handler.WithCORS(handler.NewRouter(h)),
+        Handler:      metrics.Middleware(handler.WithCORS(mux)),
         ReadTimeout:  10 * time.Second,
         WriteTimeout: 10 * time.Second,
         IdleTimeout:  60 * time.Second,

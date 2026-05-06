@@ -8,7 +8,9 @@ import (
     "github.com/nikivavlt/base/todo/internal/db"
     "github.com/nikivavlt/base/todo/internal/handler"
     "github.com/nikivavlt/base/todo/internal/kafka"
+    "github.com/nikivavlt/base/todo/internal/metrics"
     "github.com/nikivavlt/base/todo/internal/middleware"
+    "github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -33,9 +35,13 @@ func main() {
     h      := handler.New(queries, producer)
     router := handler.NewRouter(h, auth)
 
+    mux := http.NewServeMux()
+    mux.Handle("/metrics", promhttp.Handler())
+    mux.Handle("/", router)
+
     srv := &http.Server{
         Addr:    ":8080",
-        Handler: handler.WithCORS(router),
+        Handler: metrics.Middleware(handler.WithCORS(mux)),
     }
 
     log.Println("🚀 Server running on http://localhost:8080")
